@@ -19,3 +19,4 @@ storage bucket for store the terraform state file and other media file storing a
 cloud front for global distribution 
 monitoring tool for monitor the entire cluster ex lens ide
 
+![image](https://user-images.githubusercontent.com/58562297/210969821-969db516-59f4-4a04-a1e2-70639380fafb.png)
