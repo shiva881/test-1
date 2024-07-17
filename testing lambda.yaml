@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  AthenaWorkGroup:
+    Type: String
+    Default: cba_workgroup_name  # Replace with your Athena WorkGroup name
+
+Resources:
+  AthenaServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AthenaQueryExecutionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: "*"
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: "*"
+
+  AthenaQueryLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+
+          def lambda_handler(event, context):
+              client = boto3.client('athena')
+              query = "SELECT * FROM my_table WHERE column = 'value'"
+              response = client.start_query_execution(
+                  QueryString=query,
+                  QueryExecutionContext={
+                      'Database': 'cbsgule'  # Replace with your Glue database name
+                  },
+                  ResultConfiguration={
+                      'OutputLocation': 's3://my-shiva881/'  # Replace with your S3 bucket
+                  }
+              )
+              return response
+
+      Runtime: python3.8
+      Timeout: 60
+
+  AthenaQuerySchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: "rate(5 minutes)"
+      Description: Schedule to run Athena query every 5 minutes
+      State: ENABLED
+      Targets:
+        - Id: RunAthenaQueryTarget
+          Arn: !GetAtt AthenaQueryLambdaFunction.Arn
+
+Outputs:
+  LambdaFunctionARN:
+    Description: Lambda function ARN to run Athena query
+    Value: !GetAtt AthenaQueryLambdaFunction.Arn
+
+  AthenaWorkGroupOutput:
+    Description: Athena WorkGroup name used in the automation
+    Value: !Ref AthenaWorkGroup

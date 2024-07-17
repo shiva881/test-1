@@ -1,0 +1,26 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation template for setting up Amazon QuickSight with Athena
+Parameters:
+  QuickSightUserName:
+    Type: String
+    Description: Username for Amazon QuickSight user
+    MinLength: 1
+    MaxLength: 64
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: Username must start with a letter and contain only alphanumeric characters.
+Resources:
+  AthenaDataSource:
+    Type: AWS::QuickSight::DataSource
+    Properties:
+      AwsAccountId: ${AWS::AccountId}
+      DataSourceId: AthenaDataSource
+      Name: AthenaDataSource
+      Type: ATHENA
+      DataSourceParameters:
+        AthenaParameters:
+          WorkGroup: AthenaWorkGroupName
+Outputs:
+  AthenaDataSourceArn:
+    Description: ARN of the Amazon QuickSight Athena Data Source
+    Value: AthenaDataSource.Arn

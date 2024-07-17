@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: GluePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::my-shiva881
+                  - arn:aws:s3:::my-shiva881/*
+                  - arn:aws:s3:::my-shiva881/scripts/my_glue_script.py
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - glue:CreateDatabase
+                  - glue:GetDatabase
+                  - glue:CreateTable
+                  - glue:DeleteTable
+                  - glue:GetTable
+                  - glue:GetTables
+                  - glue:GetTableVersion
+                  - glue:GetTableVersions
+                  - glue:BatchGetPartition
+                  - glue:BatchCreatePartition
+                  - glue:UpdateTable
+                  - glue:DeleteDatabase
+                  - glue:GetJob
+                  - glue:UpdateJob
+                  - glue:GetTable
+                  - glue:UpdateTable
+                  - glue:GetPartition
+                  - glue:UpdatePartition
+                  - glue:StartJobRun
+                  - glue:GetJobRun
+                  - glue:GetConnection
+                  - glue:GetConnections
+                  - glue:BatchStopJobRun
+                Resource: "*"
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref "AWS::AccountId"
+      DatabaseInput:
+        Name: cbsgule
+
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: cba_crawler_name
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: s3://my-shiva881/data/
+      Schedule:
+        ScheduleExpression: "cron(0 12 * * ? *)"  # Ensure the cron expression is quoted correctly
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+
+  GlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: cba_glue_job
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: s3://my-shiva881/scripts/my_glue_script.py
+        PythonVersion: "3"
+      DefaultArguments:
+        --TempDir: s3://my-shiva881/temp/
+        --job-language: python
+      GlueVersion: "2.0"
+      Timeout: 2880
+      NumberOfWorkers: 10
+      WorkerType: G.1X
+
+  MyGlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: "cbsgule"  # Name of your Glue database
+      TableInput:
+        Name: "my_table"
+        TableType: "EXTERNAL_TABLE"
+        Parameters:
+          classification: "json"
+        StorageDescriptor:
+          Columns:
+            - Name: column1
+              Type: string
+            - Name: column2
+              Type: int
+            # Add more columns as needed
+          Location: "s3://my-shiva881/data/"
+          InputFormat: "org.apache.hadoop.mapred.TextInputFormat"
+          OutputFormat: "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+          SerdeInfo:
+            SerializationLibrary: "org.openx.data.jsonserde.JsonSerDe"
