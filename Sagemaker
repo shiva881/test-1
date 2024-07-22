@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Resources:
+  SageMakerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SageMakerPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - glue:*
+                  - athena:*
+                Resource: "*"
+
+  NotebookLifecycleConfig:
+    Type: AWS::SageMaker::NotebookInstanceLifecycleConfig
+    Properties:
+      NotebookInstanceLifecycleConfigName: my-lifecycle-config  # Ensure this is a valid name
+      OnStart:
+        - Content: !Base64 |
+            #!/bin/bash
+            set -e
+            echo "Lifecycle configuration script executed successfully." > /home/ec2-user/lifecycle.log
+
+  SageMakerNotebookInstance:
+    Type: AWS::SageMaker::NotebookInstance
+    Properties:
+      NotebookInstanceName: my-sagemaker-notebook
+      InstanceType: ml.t2.medium
+      RoleArn: !GetAtt SageMakerExecutionRole.Arn
+      VolumeSizeInGB: 10
+      DirectInternetAccess: Enabled
+      RootAccess: Enabled
+      LifecycleConfigName: my-lifecycle-config  # Reference the lifecycle config name directly
+
+Outputs:
+  SageMakerNotebookInstanceOutput:
+    Description: SageMaker Notebook Instance Name
+    Value: !Ref SageMakerNotebookInstance
+  SageMakerExecutionRoleOutput:
+    Description: SageMaker Execution Role ARN
+    Value: !GetAtt SageMakerExecutionRole.Arn
