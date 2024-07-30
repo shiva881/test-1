@@ -1,0 +1,148 @@
+import * as cdk from 'aws-cdk-lib';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
+
+export interface LambdastackStackProps extends cdk.StackProps {
+  vpcId: string;
+  subnetIds: string[];
+  athenaWorkGroup?: string;
+}
+
+export class LambdastackStack extends cdk.Stack {
+  public readonly lambdaFunctionArn: string;
+  public readonly athenaWorkGroupOutput: string;
+
+  constructor(scope: cdk.App, id: string, props: LambdastackStackProps = { athenaWorkGroup: 'cba_workgroup_name' }) {
+    super(scope, id, props);
+
+    // Import existing VPC
+    const vpc = Vpc.fromVpcAttributes(this, 'VPC', {
+      vpcId: props.vpcId,
+      availabilityZones: cdk.Stack.of(this).availabilityZones,
+      publicSubnetIds: props.subnetIds,
+    });
+
+    const athenaServiceRole = new iam.CfnRole(this, 'AthenaServiceRole', {
+      assumeRolePolicyDocument: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: { Service: 'lambda.amazonaws.com' },
+            Action: 'sts:AssumeRole',
+          },
+        ],
+      },
+      policies: [
+        {
+          policyName: 'AthenaQueryExecutionPolicy',
+          policyDocument: {
+            Version: '2012-10-17',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Action: ['athena:StartQueryExecution', 'athena:GetQueryExecution', 'athena:GetQueryResults'],
+                Resource: '*',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const lambdaExecutionRole = new iam.CfnRole(this, 'LambdaExecutionRole', {
+      assumeRolePolicyDocument: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: { Service: 'lambda.amazonaws.com' },
+            Action: 'sts:AssumeRole',
+          },
+        ],
+      },
+      policies: [
+        {
+          policyName: 'LambdaExecutionPolicy',
+          policyDocument: {
+            Version: '2012-10-17',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Action: [
+                  'logs:CreateLogGroup',
+                  'logs:CreateLogStream',
+                  'logs:PutLogEvents',
+                  'athena:StartQueryExecution',
+                  'athena:GetQueryExecution',
+                  'athena:GetQueryResults',
+                ],
+                Resource: '*',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const athenaQueryLambdaFunction = new lambda.CfnFunction(this, 'AthenaQueryLambdaFunction', {
+      handler: 'index.lambda_handler',
+      role: lambdaExecutionRole.attrArn,
+      code: {
+        zipFile: `
+          import boto3
+
+          def lambda_handler(event, context):
+            client = boto3.client('athena')
+            query = "SELECT * FROM my_table WHERE column = 'value'"
+            response = client.start_query_execution(
+              QueryString=query,
+              QueryExecutionContext={
+                'Database': 'cbsgule'
+              },
+              ResultConfiguration={
+                'OutputLocation': 's3://my-shiva881/'
+              }
+            )
+            return response
+        `,
+      },
+      runtime: 'python3.8',
+      timeout: 60,
+      vpcConfig: {
+        subnetIds: vpc.publicSubnets.map(subnet => subnet.subnetId),
+        securityGroupIds: [],  // Add security group IDs if needed
+      },
+    });
+
+    const athenaQuerySchedule = new events.CfnRule(this, 'AthenaQuerySchedule', {
+      scheduleExpression: 'rate(5 minutes)',
+      description: 'Schedule to run Athena query every 5 minutes',
+      state: 'ENABLED',
+      targets: [
+        {
+          id: 'RunAthenaQueryTarget',
+          arn: athenaQueryLambdaFunction.attrArn,
+        },
+      ],
+    });
+
+    // Outputs
+    this.lambdaFunctionArn = athenaQueryLambdaFunction.attrArn;
+    new cdk.CfnOutput(this, 'CfnOutputLambdaFunctionARN', {
+      key: 'LambdaFunctionARN',
+      description: 'Lambda function ARN to run Athena query',
+      value: this.lambdaFunctionArn.toString(),
+    });
+
+    this.athenaWorkGroupOutput = props.athenaWorkGroup!;
+    new cdk.CfnOutput(this, 'CfnOutputAthenaWorkGroupOutput', {
+      key: 'AthenaWorkGroupOutput',
+      description: 'Athena WorkGroup name used in the automation',
+      value: this.athenaWorkGroupOutput.toString(),
+    });
+  }
+}
