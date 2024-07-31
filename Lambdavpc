@@ -1,3 +1,4 @@
+// lib/lambdastack-stack.ts
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -5,44 +6,18 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as events from 'aws-cdk-lib/aws-events';
 import { Vpc } from 'aws-cdk-lib/aws-ec2';
 
-export class LambdastackStack extends cdk.Stack {
-  public readonly lambdaFunctionArn: cdk.CfnOutput;
-  public readonly athenaWorkGroupOutput: cdk.CfnOutput;
+// Define a custom interface that extends StackProps
+interface LambdaStackProps extends cdk.StackProps {
+  athenaWorkGroup: string;
+}
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+export class LambdastackStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
     // Use dummy VPC ID and subnet IDs
     const vpc = Vpc.fromLookup(this, 'Vpc', {
       vpcId: 'vpc-12345678',  // Replace with your actual VPC ID
-    });
-
-    const athenaServiceRole = new iam.CfnRole(this, 'AthenaServiceRole', {
-      assumeRolePolicyDocument: {
-        Version: '2012-10-17',
-        Statement: [{
-          Effect: 'Allow',
-          Principal: {
-            Service: 'lambda.amazonaws.com',
-          },
-          Action: 'sts:AssumeRole',
-        }],
-      },
-      policies: [{
-        policyName: 'AthenaQueryExecutionPolicy',
-        policyDocument: {
-          Version: '2012-10-17',
-          Statement: [{
-            Effect: 'Allow',
-            Action: [
-              'athena:StartQueryExecution',
-              'athena:GetQueryExecution',
-              'athena:GetQueryResults',
-            ],
-            Resource: '*',
-          }],
-        },
-      }],
     });
 
     const lambdaExecutionRole = new iam.CfnRole(this, 'LambdaExecutionRole', {
@@ -112,16 +87,6 @@ def lambda_handler(event, context):
         id: 'RunAthenaQueryTarget',
         arn: athenaQueryLambdaFunction.attrArn,
       }],
-    });
-
-    this.lambdaFunctionArn = new cdk.CfnOutput(this, 'LambdaFunctionARN', {
-      value: athenaQueryLambdaFunction.attrArn,
-      description: 'Lambda function ARN to run Athena query',
-    });
-
-    this.athenaWorkGroupOutput = new cdk.CfnOutput(this, 'AthenaWorkGroupOutput', {
-      value: props?.athenaWorkGroup ?? 'default',
-      description: 'Athena WorkGroup name used in the automation',
     });
   }
 }
