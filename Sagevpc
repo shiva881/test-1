@@ -1,19 +1,19 @@
+ 
 import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import { CfnNotebookInstance, CfnNotebookInstanceLifecycleConfig } from 'aws-cdk-lib/aws-sagemaker';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Vpc } from 'aws-cdk-lib/aws-ec2';
 
 export class SagemakerstackStack extends cdk.Stack {
   public readonly sageMakerNotebookInstanceOutput: cdk.CfnOutput;
   public readonly sageMakerExecutionRoleOutput: cdk.CfnOutput;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.App, id: string, props: cdk.StackProps = {}) {
     super(scope, id, props);
 
     // Use dummy VPC ID and subnet IDs
     const vpc = Vpc.fromLookup(this, 'Vpc', {
-      vpcId: 'vpc-12345678',  // Replace with your actual VPC ID
+      vpcId: 'vpc-12345678',  // Dummy VPC ID
     });
 
     const notebookLifecycleConfig = new CfnNotebookInstanceLifecycleConfig(this, 'NotebookLifecycleConfig', {
@@ -61,7 +61,7 @@ export class SagemakerstackStack extends cdk.Stack {
       directInternetAccess: 'Enabled',
       rootAccess: 'Enabled',
       lifecycleConfigName: notebookLifecycleConfig.ref,
-      subnetId: 'subnet-12345678',  // Replace with your actual subnet ID
+      subnetId: 'subnet-12345678',  // Dummy subnet ID
     });
 
     this.sageMakerNotebookInstanceOutput = new cdk.CfnOutput(this, 'SageMakerNotebookInstanceOutput', {
