@@ -1,71 +1,59 @@
 import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as sagemaker from 'aws-cdk-lib/aws-sagemaker';
-import { SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
-
-export interface SagemakerstackStackProps extends cdk.StackProps {
-  vpcId: string;
-  subnetIds: string[];
-}
+import { CfnNotebookInstance, CfnNotebookInstanceLifecycleConfig } from 'aws-cdk-lib/aws-sagemaker';
+import { Vpc } from 'aws-cdk-lib/aws-ec2';
 
 export class SagemakerstackStack extends cdk.Stack {
-  public readonly sageMakerNotebookInstanceOutput: string;
-  public readonly sageMakerExecutionRoleOutput: string;
+  public readonly sageMakerNotebookInstanceOutput: cdk.CfnOutput;
+  public readonly sageMakerExecutionRoleOutput: cdk.CfnOutput;
 
-  constructor(scope: cdk.App, id: string, props: SagemakerstackStackProps) {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Import existing VPC
-    const vpc = Vpc.fromVpcAttributes(this, 'VPC', {
-      vpcId: props.vpcId,
-      availabilityZones: cdk.Stack.of(this).availabilityZones,
-      publicSubnetIds: props.subnetIds,
+    // Use dummy VPC ID and subnet IDs
+    const vpc = Vpc.fromLookup(this, 'Vpc', {
+      vpcId: 'vpc-12345678',  // Replace with your actual VPC ID
     });
 
-    const notebookLifecycleConfig = new sagemaker.CfnNotebookInstanceLifecycleConfig(this, 'NotebookLifecycleConfig', {
+    const notebookLifecycleConfig = new CfnNotebookInstanceLifecycleConfig(this, 'NotebookLifecycleConfig', {
       notebookInstanceLifecycleConfigName: 'my-lifecycle-config',
-      onStart: [
-        {
-          content: cdk.Fn.base64('#!/bin/bash\nset -e\necho "Lifecycle configuration script executed successfully." > /home/ec2-user/lifecycle.log\n'),
-        },
-      ],
+      onStart: [{
+        content: cdk.Fn.base64('#!/bin/bash\nset -e\necho "Lifecycle configuration script executed successfully." > /home/ec2-user/lifecycle.log\n'),
+      }],
     });
 
     const sageMakerExecutionRole = new iam.CfnRole(this, 'SageMakerExecutionRole', {
       assumeRolePolicyDocument: {
         Version: '2012-10-17',
-        Statement: [
-          {
-            Effect: 'Allow',
-            Principal: { Service: 'sagemaker.amazonaws.com' },
-            Action: 'sts:AssumeRole',
+        Statement: [{
+          Effect: 'Allow',
+          Principal: {
+            Service: 'sagemaker.amazonaws.com',
           },
-        ],
+          Action: 'sts:AssumeRole',
+        }],
       },
-      policies: [
-        {
-          policyName: 'SageMakerPolicy',
-          policyDocument: {
-            Version: '2012-10-17',
-            Statement: [
-              {
-                Effect: 'Allow',
-                Action: [
-                  's3:GetObject',
-                  's3:PutObject',
-                  's3:ListBucket',
-                  'glue:*',
-                  'athena:*',
-                ],
-                Resource: '*',
-              },
+      policies: [{
+        policyName: 'SageMakerPolicy',
+        policyDocument: {
+          Version: '2012-10-17',
+          Statement: [{
+            Effect: 'Allow',
+            Action: [
+              's3:GetObject',
+              's3:PutObject',
+              's3:ListBucket',
+              'glue:*',
+              'athena:*',
             ],
-          },
+            Resource: '*',
+          }],
         },
-      ],
+      }],
     });
 
-    const sageMakerNotebookInstance = new sagemaker.CfnNotebookInstance(this, 'SageMakerNotebookInstance', {
+    const sageMakerNotebookInstance = new CfnNotebookInstance(this, 'SageMakerNotebookInstance', {
       notebookInstanceName: 'my-sagemaker-notebook',
       instanceType: 'ml.t2.medium',
       roleArn: sageMakerExecutionRole.attrArn,
@@ -73,22 +61,17 @@ export class SagemakerstackStack extends cdk.Stack {
       directInternetAccess: 'Enabled',
       rootAccess: 'Enabled',
       lifecycleConfigName: notebookLifecycleConfig.ref,
-      subnetId: vpc.publicSubnets[0].subnetId,  // Using the first public subnet
+      subnetId: 'subnet-12345678',  // Replace with your actual subnet ID
     });
 
-    // Outputs
-    this.sageMakerNotebookInstanceOutput = sageMakerNotebookInstance.ref;
-    new cdk.CfnOutput(this, 'CfnOutputSageMakerNotebookInstanceOutput', {
-      key: 'SageMakerNotebookInstanceOutput',
+    this.sageMakerNotebookInstanceOutput = new cdk.CfnOutput(this, 'SageMakerNotebookInstanceOutput', {
+      value: sageMakerNotebookInstance.ref,
       description: 'SageMaker Notebook Instance Name',
-      value: this.sageMakerNotebookInstanceOutput.toString(),
     });
 
-    this.sageMakerExecutionRoleOutput = sageMakerExecutionRole.attrArn;
-    new cdk.CfnOutput(this, 'CfnOutputSageMakerExecutionRoleOutput', {
-      key: 'SageMakerExecutionRoleOutput',
+    this.sageMakerExecutionRoleOutput = new cdk.CfnOutput(this, 'SageMakerExecutionRoleOutput', {
+      value: sageMakerExecutionRole.attrArn,
       description: 'SageMaker Execution Role ARN',
-      value: this.sageMakerExecutionRoleOutput.toString(),
     });
   }
 }
