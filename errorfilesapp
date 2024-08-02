@@ -1,0 +1,122 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BaseAppPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "glue:*",
+        "iam:ListRoles",
+        "iam:ListUsers",
+        "iam:ListGroups",
+        "iam:ListRolePolicies",
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "s3:ListAllMyBuckets",
+        "s3:ListBucket",
+        "s3:GetBucketAcl",
+        "s3:GetBucketLocation",
+        "kms:ListAliases",
+        "kms:DescribeKey",
+        "kms:Decrypt",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:ListDashboards",
+        "quicksight:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::aus-glue-*/*",
+        "arn:aws:s3:::aws-glue.*",
+        "arn:aws:s3:::aws-glue-*/**"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "tag:GetResources"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket"
+      ],
+      "Resource": "arn:aws:s3:::aws-glue-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:GetLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:*:log-group:/aws-glue/*"
+      ]
+    },
+    {
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:iam::*:role/AWSGlueServiceRole*"
+      ],
+      "Condition": {
+        "StringLike": {
+          "iam:PassedToService": [
+            "glue.amazonaws.com"
+          ]
+        }
+      }
+    },
+    {
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:iam::*:role/AWSGlueServiceNotebookRole*"
+      ],
+      "Condition": {
+        "StringLike": {
+          "iam:PassedToService": [
+            "ec2.amazonaws.com"
+          ]
+        }
+      }
+    },
+    {
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:iam::*:role/service-role/AWSGlueServiceRole*"
+      ],
+      "Condition": {
+        "StringLike": {
+          "iam:PassedToService": [
+            "glue.amazonaws.com"
+          ]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:DescribeKey",
+        "kms:ListAliases"
+      ],
+      "Resource": "arn:aws:kms:region:account-id:key/key-id"
+    }
+  ]
+}
